@@ -938,14 +938,12 @@ static int super_90_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor
 	char b[BDEVNAME_SIZE], b2[BDEVNAME_SIZE];
 	mdp_super_t *sb;
 	int ret;
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	/*
 	 * Calculate the position of the superblock (512byte sectors),
 	 * it's at the end of the disk.
 	 *
 	 * It also happens to be a multiple of 4Kb.
 	 */
-	printk("MikeT: load super for 0.90.0\n");
 	rdev->sb_start = calc_dev_sboffset(rdev);
 
 	ret = read_disk_sb(rdev, MD_SB_BYTES);
@@ -984,7 +982,6 @@ static int super_90_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor
 	rdev->data_offset = 0;
 	rdev->new_data_offset = 0;
 	rdev->sb_size = MD_SB_BYTES;
-	printk("MikeT: disabled badblocks\n");
 	rdev->badblocks.shift = -1;
 
 	if (sb->level == LEVEL_MULTIPATH)
@@ -1039,7 +1036,6 @@ static int super_90_validate(struct mddev *mddev, struct md_rdev *rdev)
 	mdp_disk_t *desc;
 	mdp_super_t *sb = page_address(rdev->sb_page);
 	__u64 ev1 = md_event(sb);
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	rdev->raid_disk = -1;
 	clear_bit(Faulty, &rdev->flags);
 	clear_bit(In_sync, &rdev->flags);
@@ -1164,7 +1160,6 @@ static void super_90_sync(struct mddev *mddev, struct md_rdev *rdev)
 	mdp_super_t *sb;
 	struct md_rdev *rdev2;
 	int next_spare = mddev->raid_disks;
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	/* make rdev->sb match mddev data..
 	 *
 	 * 1/ zero out disks
@@ -1304,7 +1299,6 @@ static void super_90_sync(struct mddev *mddev, struct md_rdev *rdev)
 static unsigned long long
 super_90_rdev_size_change(struct md_rdev *rdev, sector_t num_sectors)
 {
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	if (num_sectors && num_sectors < rdev->mddev->dev_sectors)
 		return 0; /* component must fit device */
 	if (rdev->mddev->bitmap_info.offset)
@@ -1326,7 +1320,6 @@ super_90_rdev_size_change(struct md_rdev *rdev, sector_t num_sectors)
 static int
 super_90_allow_new_offset(struct md_rdev *rdev, unsigned long long new_offset)
 {
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	/* non-zero offset changes not possible with v0.90 */
 	return new_offset == 0;
 }
@@ -1367,7 +1360,6 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 	sector_t sectors;
 	char b[BDEVNAME_SIZE], b2[BDEVNAME_SIZE];
 	int bmask;
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	/*
 	 * Calculate the position of the superblock in 512byte sectors.
 	 * It is always aligned to a 4K boundary and
@@ -1474,7 +1466,6 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 				  rdev->bb_page, READ, true))
 			return -EIO;
 		bbp = (u64 *)page_address(rdev->bb_page);
-		printk("MikeT: enable badblocks\n");
 		rdev->badblocks.shift = sb->bblog_shift;
 		for (i = 0 ; i < (sectors << (9-3)) ; i++, bbp++) {
 			u64 bb = le64_to_cpu(*bbp);
@@ -1489,13 +1480,8 @@ static int super_1_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor_
 				return -EINVAL;
 		}
 	} else if (sb->bblog_offset != 0)
-	{
-		printk("MikeT: enable badblocks\n");
 		rdev->badblocks.shift = 0;
-	} else
-	{
-		printk("MikeT: %s %s %d, ?\n", __FILE__, __func__, __LINE__);
-	}
+
 	if (!refdev) {
 		ret = 1;
 	} else {
@@ -1535,7 +1521,6 @@ static int super_1_validate(struct mddev *mddev, struct md_rdev *rdev)
 {
 	struct mdp_superblock_1 *sb = page_address(rdev->sb_page);
 	__u64 ev1 = le64_to_cpu(sb->events);
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	rdev->raid_disk = -1;
 	clear_bit(Faulty, &rdev->flags);
 	clear_bit(In_sync, &rdev->flags);
@@ -1672,7 +1657,6 @@ static void super_1_sync(struct mddev *mddev, struct md_rdev *rdev)
 	struct md_rdev *rdev2;
 	int max_dev, i;
 	/* make rdev->sb match mddev and rdev data. */
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	sb = page_address(rdev->sb_page);
 
 	sb->feature_map = 0;
@@ -1812,7 +1796,6 @@ super_1_rdev_size_change(struct md_rdev *rdev, sector_t num_sectors)
 {
 	struct mdp_superblock_1 *sb;
 	sector_t max_sectors;
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	if (num_sectors && num_sectors < rdev->mddev->dev_sectors)
 		return 0; /* component must fit device */
 	if (rdev->data_offset != rdev->new_data_offset)
@@ -1853,7 +1836,6 @@ super_1_allow_new_offset(struct md_rdev *rdev,
 {
 	/* All necessary checks on new >= old have been done */
 	struct bitmap *bitmap;
-	printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 	if (new_offset >= rdev->data_offset)
 		return 1;
 
@@ -3023,7 +3005,6 @@ int md_rdev_init(struct md_rdev *rdev)
 	 * be used - I wonder if that matters
 	 */
 	rdev->badblocks.count = 0;
-	printk("MikeT: disabled badblocks\n");
 	rdev->badblocks.shift = -1; /* disabled until explicitly enabled */
 	rdev->badblocks.page = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	seqlock_init(&rdev->badblocks.lock);
@@ -3711,7 +3692,6 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 	case suspended:
 		break; /* not supported yet */
 	case readonly:
-		printk("MikeT: %s %s %d, set readonly\n", __FILE__, __func__, __LINE__);
 		if (mddev->pers)
 			err = md_set_readonly(mddev, NULL);
 		else {
@@ -3722,7 +3702,6 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 		break;
 	case read_auto:
 		if (mddev->pers) {
-			printk("MikeT: %s %s %d, pers\n", __FILE__, __func__, __LINE__);
 			if (mddev->ro == 0)
 				err = md_set_readonly(mddev, NULL);
 			else if (mddev->ro == 1)
@@ -3732,7 +3711,6 @@ array_state_store(struct mddev *mddev, const char *buf, size_t len)
 				set_disk_ro(mddev->gendisk, 0);
 			}
 		} else {
-			printk("MikeT: %s %s %d, no pers\n", __FILE__, __func__, __LINE__);
 			mddev->ro = 2;
 			err = do_md_run(mddev);
 		}
@@ -4896,7 +4874,6 @@ int md_run(struct mddev *mddev)
 
 	if (start_readonly && mddev->ro == 0)
 	{
-		printk("MikeT: %s %s %d, read-only, switch on first write\n", __FILE__, __func__, __LINE__);
 		mddev->ro = 2; /* read-only, but switch on first write */
 	}
 	err = mddev->pers->run(mddev);
@@ -5116,7 +5093,6 @@ static int md_set_readonly(struct mddev *mddev, struct block_device *bdev)
 {
 	int err = 0;
 	int did_freeze = 0;
-	printk("MikeT: %s %s %d, set ro\n", __FILE__, __func__, __LINE__);
 	if (!test_bit(MD_RECOVERY_FROZEN, &mddev->recovery)) {
 		did_freeze = 1;
 		set_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
@@ -6411,7 +6387,6 @@ static int md_ioctl(struct block_device *bdev, fmode_t mode,
 		if (mddev->pers) {
 			err = restart_array(mddev);
 			if (err == 0) {
-				printk("MikeT: %s %s %d\n", __FILE__, __func__, __LINE__);
 				mddev->ro = 2;
 				set_disk_ro(mddev->gendisk, 0);
 			}
@@ -7716,10 +7691,7 @@ void md_check_recovery(struct mddev *mddev)
 		}
 
 		if (mddev->flags & MD_UPDATE_SB_FLAGS)
-		{
-			printk("MikeT: %s %s %d, update super block\n", __FILE__, __func__, __LINE__);
 			md_update_sb(mddev, 0);
-		}
 
 		if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery) &&
 		    !test_bit(MD_RECOVERY_DONE, &mddev->recovery)) {
@@ -7967,6 +7939,127 @@ retry:
 }
 EXPORT_SYMBOL_GPL(md_is_badblock);
 
+int gcblocks_randh()
+{
+	int v = 1;
+	int i;
+	get_random_bytes(&i, sizeof(i));
+	while((i>>16) & 0x01)
+	{
+		v++;
+	}
+	return v;
+}
+struct gcblock *get_new_gcblock()
+{
+	struct gcblock *gbk;
+	gbk = (struct gcblock*)kmalloc(sizeof(struct gcblock), GFP_KERNEL);
+	gbk->height = 0;
+	gbk->next = NULL;
+	return gbk;
+}
+struct gcblocks *get_new_gcblocks()
+{
+	struct gcblocks *gb;
+	gb = (struct gcblocks*)kmalloc(sizeof(struct gcblocks), GFP_KERNEL);
+	gb->head = get_new_gcblock();
+	gb->head->height = 1;
+	gb->head->next = (struct gcblock**)kmalloc(1*sizeof(struct gcblock *), GFP_KERNEL);
+	gb->head->next[0] = NULL;
+	
+	gb->hRec = (int *)kmalloc(1*sizeof(int), GFP_KERNEL);
+	gb->hRec[0] = 0;
+	return gb;
+}
+void put_gcblock(struct gcblock *gbk)
+{
+	if(gbk->next)
+		kfree(gbk->next);
+	kfree(gbk);
+}
+void put_gcblocks(struct gcblocks *gb)
+{
+	struct gcblock *d, *n;
+	n = d = gb->head;
+	while(n)
+	{
+		d = n;
+		n = n->next[0];
+		put_gcblock(d);
+	}
+	kfree(gb->hRec);
+	kfree(gb);
+}
+
+int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
+{
+	int h = gcblocks_randh();
+	int hh = gb->head->height;
+	struct gcblock *head = gb->head;
+	struct gcblock *gbk = get_new_gcblock();
+	
+	gbk->height = h;
+	gbk->next = (struct gcblock**)kmalloc(h * sizeof(struct gcblock *), GFP_KERNEL);
+	gbk->s = s;
+	gbk->sectors = sectors;
+	
+	while(h > hh)
+		hh = hh * 2;
+	
+	if(hh != head->height)
+	{
+		struct gcblock *newgbh = get_new_gcblock();
+		int i;
+		newgbh->height = hh;
+		newgbh->next = (struct gcblock**)kmalloc(hh * sizeof(struct gcblock *), GFP_KERNEL);
+		for(i = 0; i < head->height; i++)
+		{
+			newgbh->next[i] = head->next[i];
+		}
+		for(; i < hh; i++)
+		{
+			newgbh->next[i] = NULL;
+		}
+		int* new_hRec = (int *)kmalloc(hh * sizeof(int), GFP_KERNEL);
+		memset(new_hRec, 0 hh*sizeof(int));
+		memcpy(new_hRec, gb->hRec, head->height*sizeof(int));
+		put_gcblock(head);
+		head = gb->head = newgbh;
+		kfree(gb->hRec);
+		gb->hRec = new_hRec;
+	}
+	gb->hRec[gbk->height - 1]++;
+	int l = head->height - 1;
+	struct gcblock *x = head;
+	while(l > = 0)
+	{
+		struct gcblock *y = x->next[l];
+		if(y == NULL || y->s > gb->s)
+		{
+			if(l < h)
+			{
+				gb->next[l] = x->next[l];
+				x->next[l] = gb;
+			}
+			l--;
+		}
+		else
+			x = y;
+	}
+}
+int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
+{
+	
+}
+int md_init_gcblocks(struct gcblocks *gb)
+{
+	
+}
+int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors)
+{
+	
+}
+
 /*
  * Add a range of bad blocks to the table.
  * This might extend the table, or might contract it
@@ -7984,7 +8077,6 @@ static int md_set_badblocks(struct badblocks *bb, sector_t s, int sectors,
 
 	if (bb->shift < 0)
 	{
-		printk("MikeT: Badblocks are disabled\n");
 		/* badblocks are disabled */
 		return 0;
 	}
@@ -8095,7 +8187,6 @@ static int md_set_badblocks(struct badblocks *bb, sector_t s, int sectors,
 		 * Need to add a range just before 'hi' */
 		if (bb->count >= MD_MAX_BADBLOCKS) {
 			/* No room for more */
-			printk("MikeT: No room for more\n");
 			rv = 0;
 			break;
 		} else {

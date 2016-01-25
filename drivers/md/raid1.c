@@ -1109,7 +1109,7 @@ static void make_request(struct mddev *mddev, struct bio * bio)
 	 */
 
 	md_write_start(mddev, bio); /* wait on superblock update early */
-    printk("MikeT: %s %s %d, after md_write_start, major_version: %d\n", __FILE__, __func__, __LINE__, mddev->major_version);
+
 	if (bio_data_dir(bio) == WRITE &&
 	    bio_end_sector(bio) > mddev->suspend_lo &&
 	    bio->bi_iter.bi_sector < mddev->suspend_hi) {
@@ -1820,10 +1820,7 @@ static int r1_sync_page_io(struct md_rdev *rdev, sector_t sector,
 	}
 	/* need to record an error - either for the block or the device */
 	if (!rdev_set_badblocks(rdev, sector, sectors, 0))
-	{
-		printk("MikeT: %s %s %d, error\n", __FILE__, __func__, __LINE__);
 		md_error(rdev->mddev, rdev);
-	}
 	return 0;
 }
 
@@ -2148,7 +2145,6 @@ static void fix_read_error(struct r1conf *conf, int read_disk,
 		if (!success) {
 			/* Cannot read from anywhere - mark it bad */
 			struct md_rdev *rdev = conf->mirrors[read_disk].rdev;
-			printk("MikeT: %s %s %d, cannot read from anywhere, mark it bad", __FILE__, __func__, __LINE__);
 			if (!rdev_set_badblocks(rdev, sect, s, 0))
 				md_error(mddev, rdev);
 			break;
@@ -2160,7 +2156,6 @@ static void fix_read_error(struct r1conf *conf, int read_disk,
 				d = conf->raid_disks * 2;
 			d--;
 			rdev = conf->mirrors[d].rdev;
-			printk("MikeT: %s %s %d, Faulty: %d", __FILE__, __func__, __LINE__, test_bit(Faulty, &rdev->flags));
 			if (rdev &&
 			    !test_bit(Faulty, &rdev->flags))
 				r1_sync_page_io(rdev, sect, s,
@@ -2345,10 +2340,7 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 			       r1_bio->sector, r1_bio->sectors);
 		unfreeze_array(conf);
 	} else
-	{
-		printk("MikeT: %s %s %d, ro: %d\n", __FILE__, __func__, __LINE__, mddev->ro);
 		md_error(mddev, conf->mirrors[r1_bio->read_disk].rdev);
-	}
 	rdev_dec_pending(conf->mirrors[r1_bio->read_disk].rdev, conf->mddev);
 
 	bio = r1_bio->bios[r1_bio->read_disk];
@@ -2463,10 +2455,7 @@ static void raid1d(struct md_thread *thread)
 
 		cond_resched();
 		if (mddev->flags & ~(1<<MD_CHANGE_PENDING))
-		{
-			printk("MikeT: %s %s %d, enter md_check_recovery\n", __FILE__, __func__, __LINE__);
 			md_check_recovery(mddev);
-		}
 	}
 	blk_finish_plug(&plug);
 }

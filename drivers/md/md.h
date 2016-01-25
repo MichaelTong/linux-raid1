@@ -23,6 +23,7 @@
 #include <linux/timer.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
+#include <linux/ktime.h>
 
 #define MaxSector (~(sector_t)0)
 
@@ -32,8 +33,25 @@
  * 1 bit is an 'acknowledged' flag.
  */
 #define MD_MAX_BADBLOCKS	(PAGE_SIZE/8)
-
 /*
+ * GCBlocks
+ */
+struct gcblock {
+	sector_t s;
+	int sectors;
+	ktime_t t;
+	int expire; //in ms
+	
+	int height;
+	struct gcblock **next;
+};
+struct gcblocks {
+	struct gcblock *head;
+	int *hRec;
+};
+
+
+ /*
  * MD's 'extended' device
  */
 struct md_rdev {
@@ -125,6 +143,7 @@ struct md_rdev {
 		sector_t sector;
 		sector_t size;		/* in sectors */
 	} badblocks;
+	struct gcblocks *gcblocks;
 };
 enum flag_bits {
 	Faulty,			/* device is known to have a fault */
