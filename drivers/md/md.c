@@ -7998,6 +7998,9 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 	struct gcblock *head = gb->head;
 	struct gcblock *gbk = get_new_gcblock();
 	
+	int l;
+	struct gcblock *x;
+	
 	gbk->height = h;
 	gbk->next = (struct gcblock**)kmalloc(h * sizeof(struct gcblock *), GFP_KERNEL);
 	gbk->s = s;
@@ -8028,9 +8031,10 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 		kfree(gb->hRec);
 		gb->hRec = new_hRec;
 	}
+	
 	gb->hRec[gbk->height - 1]++;
-	int l = head->height - 1;
-	struct gcblock *x = head;
+	l = head->height - 1;
+	x = head;
 	while(l >= 0)
 	{
 		struct gcblock *y = x->next[l];
@@ -8049,15 +8053,70 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 }
 int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 {
+	struct gcblock *head = gb->head;
+	int l = head->height -1;
+	struct gcblock *x = head;
 	
+	while(l >= 0)
+	{
+		struct gcblock *y = x->next[l];
+		if(l != 0 && y != NULL && y->s == s)
+		{
+			struct gcblock *z = y;
+			while(z->next[l]!=NULL && z->next[l]->s = s)
+				z = z->next[l];
+			x->next[l] = z->next[l];
+			l--;
+		}
+		else if(l == 0 && y != NULL && y->s == s)
+		{
+			struct gcblock *z = y;
+			struct gcblock *d;
+			while(z->next[l] != NULL && z->next[l]->s == s)
+			{
+				d = z;
+				z = z->next[l];
+				hRec[d->height - 1] --;
+				put_gcblock(d);
+			}
+			d = z;
+			z = z->next[l];
+			hRec[d->height - 1]--;
+			put_gcblock(d);
+			x->next[l]=z;
+			return 1;
+		}
+		else if(y != NULL && y->s < s)
+			x = y;
+		else
+			l--;
+	}
+	return 1;
 }
-int md_init_gcblocks(struct gcblocks *gb)
-{
-	
-}
+
 int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors)
 {
+	struct gcblock *head = gb->head;
+	int l = head->height -1;
+	struct gcblock *x = head;
+	int rv = 0;
 	
+	while(l >= 0)
+	{
+		struct gcblock *y = x->next[l];
+		if(l == 0 && y!= NULL && y->s >= s)
+		{
+			rv = 1;
+			break;
+		}
+		else if(y != NULL && y->s == s)
+			l--;
+		else if(y != NULL && y->s < s)
+			x = y;
+		else 
+			l--;
+	}
+	return rv;
 }
 
 /*
