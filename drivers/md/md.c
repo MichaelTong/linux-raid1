@@ -7939,7 +7939,7 @@ retry:
 }
 EXPORT_SYMBOL_GPL(md_is_badblock);
 
-int gcblocks_randh()
+int gcblocks_randh(void)
 {
 	int v = 1;
 	int i;
@@ -7950,7 +7950,7 @@ int gcblocks_randh()
 	}
 	return v;
 }
-struct gcblock *get_new_gcblock()
+struct gcblock *get_new_gcblock(void)
 {
 	struct gcblock *gbk;
 	gbk = (struct gcblock*)kmalloc(sizeof(struct gcblock), GFP_KERNEL);
@@ -7958,7 +7958,7 @@ struct gcblock *get_new_gcblock()
 	gbk->next = NULL;
 	return gbk;
 }
-struct gcblocks *get_new_gcblocks()
+struct gcblocks *get_new_gcblocks(void)
 {
 	struct gcblocks *gb;
 	gb = (struct gcblocks*)kmalloc(sizeof(struct gcblocks), GFP_KERNEL);
@@ -8009,6 +8009,7 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 	if(hh != head->height)
 	{
 		struct gcblock *newgbh = get_new_gcblock();
+		int* new_hRec = (int *)kmalloc(hh * sizeof(int), GFP_KERNEL);
 		int i;
 		newgbh->height = hh;
 		newgbh->next = (struct gcblock**)kmalloc(hh * sizeof(struct gcblock *), GFP_KERNEL);
@@ -8020,8 +8021,7 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 		{
 			newgbh->next[i] = NULL;
 		}
-		int* new_hRec = (int *)kmalloc(hh * sizeof(int), GFP_KERNEL);
-		memset(new_hRec, 0 hh*sizeof(int));
+		memset(new_hRec, 0, hh*sizeof(int));
 		memcpy(new_hRec, gb->hRec, head->height*sizeof(int));
 		put_gcblock(head);
 		head = gb->head = newgbh;
@@ -8031,15 +8031,15 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 	gb->hRec[gbk->height - 1]++;
 	int l = head->height - 1;
 	struct gcblock *x = head;
-	while(l > = 0)
+	while(l >= 0)
 	{
 		struct gcblock *y = x->next[l];
-		if(y == NULL || y->s > gb->s)
+		if(y == NULL || y->s > gbk->s)
 		{
 			if(l < h)
 			{
-				gb->next[l] = x->next[l];
-				x->next[l] = gb;
+				gbk->next[l] = x->next[l];
+				x->next[l] = gbk;
 			}
 			l--;
 		}
