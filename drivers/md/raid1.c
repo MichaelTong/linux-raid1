@@ -573,6 +573,11 @@ static int read_balance(struct r1conf *conf, struct r1bio *r1_bio, int *max_sect
 			}
 			continue;
 		}
+		
+		if (md_is_gcblock(conf->mirrors[disk].rdev->gcblocks, this_sector, sectors))
+		/* MikeT: is doing GC */
+			continue;
+			
 		/* This is a reasonable device to use.  It might
 		 * even be best.
 		 */
@@ -2324,6 +2329,7 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 	struct bio *bio;
 	char b[BDEVNAME_SIZE];
 	struct md_rdev *rdev;
+	unsigned int s, sectors;
 
 	clear_bit(R1BIO_ReadError, &r1_bio->state);
 	/* we got a read error. Maybe the drive is bad.  Maybe just
@@ -2334,14 +2340,34 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 	 * This is all done synchronously while the array is
 	 * frozen
 	 */
-	if (mddev->ro == 0) {
-		freeze_array(conf, 1);
-		fix_read_error(conf, r1_bio->read_disk,
-			       r1_bio->sector, r1_bio->sectors);
-		unfreeze_array(conf);
-	} else
-		md_error(mddev, conf->mirrors[r1_bio->read_disk].rdev);
-	rdev_dec_pending(conf->mirrors[r1_bio->read_disk].rdev, conf->mddev);
+	 
+	 /*
+	  * MikeT:
+	  * Perhaps, we read a block that is under GC in SSD.
+	  * We record it and set a expiration time. Add it to skip list
+	  * and read from the other disk.
+	  */
+	s = bio_offset(r1_bio->bios[r1_bio->read_disk]);
+	sectors = bio_sectors(r1_bio->bios[r1_bio->read_disk]);
+	printk("MikeT: read error, s: %u, sectors: %u\n", s, sectors);
+		
+	if(test_bit(9, &r1_bio->bios[r1_bio->read_disk]->bi_flags))
+	{//9 stands for GC
+		rdev = conf->mirrors[r1_bio->read_disk].rdev;
+		md_set_gcblocks(rdev->gcblocks, s, sectors);
+	}
+	else
+	{//try to fix
+		if (mddev->ro == 0) {
+			freeze_array(conf, 1);
+			fix_read_error(conf, r1_bio->read_disk,
+					   r1_bio->sector, r1_bio->sectors);
+			unfreeze_array(conf);
+		} else
+			md_error(mddev, conf->mirrors[r1_bio->read_disk].rdev);
+		rdev_dec_pending(conf->mirrors[r1_bio->read_disk].rdev, conf->mddev);
+	}	  
+	
 
 	bio = r1_bio->bios[r1_bio->read_disk];
 	bdevname(bio->bi_bdev, b);

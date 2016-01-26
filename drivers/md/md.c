@@ -748,10 +748,10 @@ void put_gcblocks(struct gcblocks *gb)
 int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 {
 	int h = gcblocks_randh();
-	int hh = gb->head->height;
-	struct gcblock *head = gb->head;
+	int hh;
+	struct gcblock *head;
 	struct gcblock *gbk = get_new_gcblock();
-	
+	unsigned long flags;
 	int l;
 	struct gcblock *x;
 	
@@ -759,6 +759,11 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 	gbk->next = (struct gcblock**)kmalloc(h * sizeof(struct gcblock *), GFP_KERNEL);
 	gbk->s = s;
 	gbk->sectors = sectors;
+	
+	write_seqlock_irqsave(&gb->lock, flags);
+	
+	hh = gb->head->height;
+	head = gb->head;
 	
 	while(h > hh)
 		hh = hh * 2;
@@ -804,6 +809,7 @@ int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 		else
 			x = y;
 	}
+	write_sequnlock_irqrestore(&gb->lock, flags);
 	return 1;
 }
 
@@ -865,10 +871,16 @@ int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
  */
 int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors)
 {
-	struct gcblock *head = gb->head;
-	int l = head->height -1;
-	struct gcblock *x = head;
+	struct gcblock *head, *x;
+	int l;
 	int rv = 0;
+	unsigned seq;
+	
+retry:
+	seq = read_seqbegin(&gb->lock);
+	head = gb->head;
+	l = head->height -1;
+	x = head;
 	
 	while(l >= 0)
 	{
@@ -909,6 +921,9 @@ int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors)
 		else 
 			l--;
 	}
+	if(read_seqretry(&gb->lock, seq))
+		goto retry;
+		
 	return rv;
 }
 
