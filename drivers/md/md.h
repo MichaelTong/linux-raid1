@@ -48,6 +48,7 @@ struct gcblock {
 struct gcblocks {
 	struct gcblock *head;
 	int *hRec;
+	seqlock_t lock;
 };
 
 

@@ -687,6 +687,231 @@ static int alloc_disk_sb(struct md_rdev *rdev)
 	return 0;
 }
 
+int gcblocks_randh(void)
+{
+	int v = 1;
+	int i;
+	get_random_bytes(&i, sizeof(i));
+	while((i>>16) & 0x01)
+	{
+		v++;
+	}
+	return v;
+}
+struct gcblock *get_new_gcblock(void)
+{
+	struct gcblock *gbk;
+	gbk = (struct gcblock*)kmalloc(sizeof(struct gcblock), GFP_KERNEL);
+	gbk->height = 0;
+	gbk->next = NULL;
+	return gbk;
+}
+struct gcblocks *get_new_gcblocks(void)
+{
+	struct gcblocks *gb;
+	gb = (struct gcblocks*)kmalloc(sizeof(struct gcblocks), GFP_KERNEL);
+	gb->head = get_new_gcblock();
+	gb->head->height = 1;
+	gb->head->next = (struct gcblock**)kmalloc(1*sizeof(struct gcblock *), GFP_KERNEL);
+	gb->head->next[0] = NULL;
+	
+	gb->hRec = (int *)kmalloc(1*sizeof(int), GFP_KERNEL);
+	gb->hRec[0] = 0;
+	return gb;
+}
+void put_gcblock(struct gcblock *gbk)
+{
+	if(gbk->next)
+		kfree(gbk->next);
+	kfree(gbk);
+}
+void put_gcblocks(struct gcblocks *gb)
+{
+	struct gcblock *d, *n;
+	n = d = gb->head;
+	while(n)
+	{
+		d = n;
+		n = n->next[0];
+		put_gcblock(d);
+	}
+	kfree(gb->hRec);
+	kfree(gb);
+}
+/*
+ * MikeT:
+ * 
+ * Add an entry in the skip list
+ * 
+ * Double the height if necessary
+ */
+int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
+{
+	int h = gcblocks_randh();
+	int hh = gb->head->height;
+	struct gcblock *head = gb->head;
+	struct gcblock *gbk = get_new_gcblock();
+	
+	int l;
+	struct gcblock *x;
+	
+	gbk->height = h;
+	gbk->next = (struct gcblock**)kmalloc(h * sizeof(struct gcblock *), GFP_KERNEL);
+	gbk->s = s;
+	gbk->sectors = sectors;
+	
+	while(h > hh)
+		hh = hh * 2;
+	
+	if(hh != head->height)
+	{
+		struct gcblock *newgbh = get_new_gcblock();
+		int* new_hRec = (int *)kmalloc(hh * sizeof(int), GFP_KERNEL);
+		int i;
+		newgbh->height = hh;
+		newgbh->next = (struct gcblock**)kmalloc(hh * sizeof(struct gcblock *), GFP_KERNEL);
+		for(i = 0; i < head->height; i++)
+		{
+			newgbh->next[i] = head->next[i];
+		}
+		for(; i < hh; i++)
+		{
+			newgbh->next[i] = NULL;
+		}
+		memset(new_hRec, 0, hh*sizeof(int));
+		memcpy(new_hRec, gb->hRec, head->height*sizeof(int));
+		put_gcblock(head);
+		head = gb->head = newgbh;
+		kfree(gb->hRec);
+		gb->hRec = new_hRec;
+	}
+	
+	gb->hRec[gbk->height - 1]++;
+	l = head->height - 1;
+	x = head;
+	while(l >= 0)
+	{
+		struct gcblock *y = x->next[l];
+		if(y == NULL || y->s > gbk->s)
+		{
+			if(l < h)
+			{
+				gbk->next[l] = x->next[l];
+				x->next[l] = gbk;
+			}
+			l--;
+		}
+		else
+			x = y;
+	}
+	return 1;
+}
+
+/*
+ * MikeT:
+ * Clear a gcblock, start at s
+ */
+int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
+{
+	struct gcblock *head = gb->head;
+	int l = head->height -1;
+	struct gcblock *x = head;
+	int *hRec = gb->hRec;
+	
+	while(l >= 0)
+	{
+		struct gcblock *y = x->next[l];
+		if(l != 0 && y != NULL && y->s == s)
+		{
+			struct gcblock *z = y;
+			while(z->next[l]!=NULL && z->next[l]->s == s)
+				z = z->next[l];
+			x->next[l] = z->next[l];
+			l--;
+		}
+		else if(l == 0 && y != NULL && y->s == s)
+		{
+			struct gcblock *z = y;
+			struct gcblock *d;
+			while(z->next[l] != NULL && z->next[l]->s == s)
+			{
+				d = z;
+				z = z->next[l];
+				hRec[d->height - 1] --;
+				put_gcblock(d);
+			}
+			d = z;
+			z = z->next[l];
+			hRec[d->height - 1]--;
+			put_gcblock(d);
+			x->next[l]=z;
+			return 1;
+		}
+		else if(y != NULL && y->s < s)
+			x = y;
+		else
+			l--;
+	}
+	return 1;
+}
+/*
+ * MikeT:
+ * 
+ * Determine if the section (starts at s, of length sectors) given 
+ * contains any gcblocks.
+ * 
+ * This should be called before read, so it can guarantee that there is 
+ * no overlap gcblocks entries in the list.
+ */
+int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors)
+{
+	struct gcblock *head = gb->head;
+	int l = head->height -1;
+	struct gcblock *x = head;
+	int rv = 0;
+	
+	while(l >= 0)
+	{
+		struct gcblock *y = x->next[l];
+		if(l == 0 && y!= NULL && y->s >= s)
+		{
+			if(s + sectors >= y->s)
+			{
+				rv = 1;
+				break;
+			}
+		}
+		else if(y != NULL && y->s == s)
+		{
+			rv = 1;
+			break;
+		}
+		else if(y != NULL && y->s < s)
+		{
+			if(y->s + y->sectors > s)
+			{
+				rv = 1;
+				break;
+			}
+			else
+				x = y;
+		}
+		else if(y != NULL && y->s >= s)
+		{
+			if(s + sectors >= y->s)
+			{
+				rv = 1;
+				break;
+			}
+			else
+				l--;
+		}
+		else 
+			l--;
+	}
+	return rv;
+}
+
 void md_rdev_clear(struct md_rdev *rdev)
 {
 	if (rdev->sb_page) {
@@ -702,6 +927,7 @@ void md_rdev_clear(struct md_rdev *rdev)
 	}
 	kfree(rdev->badblocks.page);
 	rdev->badblocks.page = NULL;
+	put_gcblocks(rdev->gcblocks);
 }
 EXPORT_SYMBOL_GPL(md_rdev_clear);
 
@@ -2980,6 +3206,8 @@ static struct kobj_type rdev_ktype = {
 	.default_attrs	= rdev_default_attrs,
 };
 
+
+
 int md_rdev_init(struct md_rdev *rdev)
 {
 	rdev->desc_nr = -1;
@@ -3010,7 +3238,9 @@ int md_rdev_init(struct md_rdev *rdev)
 	seqlock_init(&rdev->badblocks.lock);
 	if (rdev->badblocks.page == NULL)
 		return -ENOMEM;
-
+	rdev->gcblocks = get_new_gcblocks();
+	seqlock_init(&rdev->gcblocks->lock);
+	
 	return 0;
 }
 EXPORT_SYMBOL_GPL(md_rdev_init);
@@ -7938,187 +8168,6 @@ retry:
 	return rv;
 }
 EXPORT_SYMBOL_GPL(md_is_badblock);
-
-int gcblocks_randh(void)
-{
-	int v = 1;
-	int i;
-	get_random_bytes(&i, sizeof(i));
-	while((i>>16) & 0x01)
-	{
-		v++;
-	}
-	return v;
-}
-struct gcblock *get_new_gcblock(void)
-{
-	struct gcblock *gbk;
-	gbk = (struct gcblock*)kmalloc(sizeof(struct gcblock), GFP_KERNEL);
-	gbk->height = 0;
-	gbk->next = NULL;
-	return gbk;
-}
-struct gcblocks *get_new_gcblocks(void)
-{
-	struct gcblocks *gb;
-	gb = (struct gcblocks*)kmalloc(sizeof(struct gcblocks), GFP_KERNEL);
-	gb->head = get_new_gcblock();
-	gb->head->height = 1;
-	gb->head->next = (struct gcblock**)kmalloc(1*sizeof(struct gcblock *), GFP_KERNEL);
-	gb->head->next[0] = NULL;
-	
-	gb->hRec = (int *)kmalloc(1*sizeof(int), GFP_KERNEL);
-	gb->hRec[0] = 0;
-	return gb;
-}
-void put_gcblock(struct gcblock *gbk)
-{
-	if(gbk->next)
-		kfree(gbk->next);
-	kfree(gbk);
-}
-void put_gcblocks(struct gcblocks *gb)
-{
-	struct gcblock *d, *n;
-	n = d = gb->head;
-	while(n)
-	{
-		d = n;
-		n = n->next[0];
-		put_gcblock(d);
-	}
-	kfree(gb->hRec);
-	kfree(gb);
-}
-
-int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
-{
-	int h = gcblocks_randh();
-	int hh = gb->head->height;
-	struct gcblock *head = gb->head;
-	struct gcblock *gbk = get_new_gcblock();
-	
-	int l;
-	struct gcblock *x;
-	
-	gbk->height = h;
-	gbk->next = (struct gcblock**)kmalloc(h * sizeof(struct gcblock *), GFP_KERNEL);
-	gbk->s = s;
-	gbk->sectors = sectors;
-	
-	while(h > hh)
-		hh = hh * 2;
-	
-	if(hh != head->height)
-	{
-		struct gcblock *newgbh = get_new_gcblock();
-		int* new_hRec = (int *)kmalloc(hh * sizeof(int), GFP_KERNEL);
-		int i;
-		newgbh->height = hh;
-		newgbh->next = (struct gcblock**)kmalloc(hh * sizeof(struct gcblock *), GFP_KERNEL);
-		for(i = 0; i < head->height; i++)
-		{
-			newgbh->next[i] = head->next[i];
-		}
-		for(; i < hh; i++)
-		{
-			newgbh->next[i] = NULL;
-		}
-		memset(new_hRec, 0, hh*sizeof(int));
-		memcpy(new_hRec, gb->hRec, head->height*sizeof(int));
-		put_gcblock(head);
-		head = gb->head = newgbh;
-		kfree(gb->hRec);
-		gb->hRec = new_hRec;
-	}
-	
-	gb->hRec[gbk->height - 1]++;
-	l = head->height - 1;
-	x = head;
-	while(l >= 0)
-	{
-		struct gcblock *y = x->next[l];
-		if(y == NULL || y->s > gbk->s)
-		{
-			if(l < h)
-			{
-				gbk->next[l] = x->next[l];
-				x->next[l] = gbk;
-			}
-			l--;
-		}
-		else
-			x = y;
-	}
-}
-int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
-{
-	struct gcblock *head = gb->head;
-	int l = head->height -1;
-	struct gcblock *x = head;
-	int *hRec = gb->hRec;
-	
-	while(l >= 0)
-	{
-		struct gcblock *y = x->next[l];
-		if(l != 0 && y != NULL && y->s == s)
-		{
-			struct gcblock *z = y;
-			while(z->next[l]!=NULL && z->next[l]->s == s)
-				z = z->next[l];
-			x->next[l] = z->next[l];
-			l--;
-		}
-		else if(l == 0 && y != NULL && y->s == s)
-		{
-			struct gcblock *z = y;
-			struct gcblock *d;
-			while(z->next[l] != NULL && z->next[l]->s == s)
-			{
-				d = z;
-				z = z->next[l];
-				hRec[d->height - 1] --;
-				put_gcblock(d);
-			}
-			d = z;
-			z = z->next[l];
-			hRec[d->height - 1]--;
-			put_gcblock(d);
-			x->next[l]=z;
-			return 1;
-		}
-		else if(y != NULL && y->s < s)
-			x = y;
-		else
-			l--;
-	}
-	return 1;
-}
-
-int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors)
-{
-	struct gcblock *head = gb->head;
-	int l = head->height -1;
-	struct gcblock *x = head;
-	int rv = 0;
-	
-	while(l >= 0)
-	{
-		struct gcblock *y = x->next[l];
-		if(l == 0 && y!= NULL && y->s >= s)
-		{
-			rv = 1;
-			break;
-		}
-		else if(y != NULL && y->s == s)
-			l--;
-		else if(y != NULL && y->s < s)
-			x = y;
-		else 
-			l--;
-	}
-	return rv;
-}
 
 /*
  * Add a range of bad blocks to the table.
