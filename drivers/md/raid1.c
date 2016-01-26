@@ -356,6 +356,7 @@ static void raid1_end_read_request(struct bio *bio, int error)
 			bdevname(conf->mirrors[mirror].rdev->bdev,
 				 b),
 			(unsigned long long)r1_bio->sector);
+		set_bit(9, &bio->bi_flags);
 		set_bit(R1BIO_ReadError, &r1_bio->state);
 		reschedule_retry(r1_bio);
 		/* don't drop the reference on read_disk yet */
