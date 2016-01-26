@@ -2353,8 +2353,7 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 	s = r1_bio->sector;
 	sectors = r1_bio->sectors;
 	printk("MikeT: read error, s: %u, sectors: %u\n", s, sectors);
-	printk("MikeT: read error, s: %u, sectors: %u\n", bio_offset(r1_bio->bios[0]), bio_sectors(r1_bio->bios[0]));
-	printk("MikeT: read error, s: %u, sectors: %u\n", bio_offset(r1_bio->bios[1]), bio_sectors(r1_bio->bios[1]));
+	printk("MikeT: read error, s: %u, sectors: %u\n", r1_bio->bios[r1_bio->read_disk]->bi_iter.bi_sector, r1_bio->bios[r1_bio->read_disk]->bi_iter.bi_size);
 		
 	if(test_bit(9, &r1_bio->bios[r1_bio->read_disk]->bi_flags))
 	{//9 stands for GC
