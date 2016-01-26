@@ -2358,7 +2358,7 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 		
 	if(test_bit(9, &r1_bio->bios[r1_bio->read_disk]->bi_flags))
 	{//9 stands for GC
-		printk("MikeT: set gcblocks");
+		printk("MikeT: now set gcblocks");
 		rdev = conf->mirrors[r1_bio->read_disk].rdev;
 		md_set_gcblocks(rdev->gcblocks, s, sectors);
 	}
