@@ -200,7 +200,8 @@ enum flag_bits {
 #define BB_LEN(x)	(((x) & BB_LEN_MASK) + 1)
 #define BB_ACK(x)	(!!((x) & BB_ACK_MASK))
 #define BB_MAKE(a, l, ack) (((a)<<9) | ((l)-1) | ((u64)(!!(ack)) << 63))
-
+extern int md_is_gcblock(struct gcblocks *gb, sector_t s, int sectors);
+extern int md_set_gcblocks(struct gcblocks *gb, sector_t s, int sectors);
 extern int md_is_badblock(struct badblocks *bb, sector_t s, int sectors,
 			  sector_t *first_bad, int *bad_sectors);
 static inline int is_badblock(struct md_rdev *rdev, sector_t s, int sectors,
