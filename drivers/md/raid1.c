@@ -2348,6 +2348,8 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 	  * We record it and set a expiration time. Add it to skip list
 	  * and read from the other disk.
 	  */
+	printk("MikeT: read_disk: %d, s: %u, sectors: %u\n", r1_bio->read_disk,
+	r1_bio->sector, r1_bio->sectors);
 	s = bio_offset(r1_bio->bios[r1_bio->read_disk]);
 	sectors = bio_sectors(r1_bio->bios[r1_bio->read_disk]);
 	printk("MikeT: read error, s: %u, sectors: %u\n", s, sectors);
