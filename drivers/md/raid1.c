@@ -2350,12 +2350,15 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 	  */
 	printk("MikeT: read_disk: %d, s: %u, sectors: %u\n", r1_bio->read_disk,
 	r1_bio->sector, r1_bio->sectors);
-	s = bio_offset(r1_bio->bios[r1_bio->read_disk]);
-	sectors = bio_sectors(r1_bio->bios[r1_bio->read_disk]);
+	s = r1_bio->sector;
+	sectors = r1_bio->sectors;
 	printk("MikeT: read error, s: %u, sectors: %u\n", s, sectors);
+	printk("MikeT: read error, s: %u, sectors: %u\n", bio_offset(r1_bio->bios[0]), bio_sectors(r1_bio->bios[0]));
+	printk("MikeT: read error, s: %u, sectors: %u\n", bio_offset(r1_bio->bios[1]), bio_sectors(r1_bio->bios[1]));
 		
 	if(test_bit(9, &r1_bio->bios[r1_bio->read_disk]->bi_flags))
 	{//9 stands for GC
+		printk("MikeT: set gcblocks");
 		rdev = conf->mirrors[r1_bio->read_disk].rdev;
 		md_set_gcblocks(rdev->gcblocks, s, sectors);
 	}
