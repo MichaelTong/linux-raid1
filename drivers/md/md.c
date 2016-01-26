@@ -8056,6 +8056,7 @@ int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 	struct gcblock *head = gb->head;
 	int l = head->height -1;
 	struct gcblock *x = head;
+	int *hRec = gb->hRec;
 	
 	while(l >= 0)
 	{
@@ -8063,7 +8064,7 @@ int md_clear_gcblocks(struct gcblocks *gb, sector_t s, int sectors)
 		if(l != 0 && y != NULL && y->s == s)
 		{
 			struct gcblock *z = y;
-			while(z->next[l]!=NULL && z->next[l]->s = s)
+			while(z->next[l]!=NULL && z->next[l]->s == s)
 				z = z->next[l];
 			x->next[l] = z->next[l];
 			l--;
