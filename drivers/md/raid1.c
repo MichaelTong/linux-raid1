@@ -324,7 +324,7 @@ static void raid1_end_read_request(struct bio *bio, int error)
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	update_head_pos(mirror, r1_bio);
-	printk("MikeT: %s %s %d, uptodate: %d\n", __FILE__, __func__, __LINE__, uptodate);
+	
 	if (uptodate)
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	else {
@@ -2352,8 +2352,6 @@ static void handle_read_error(struct r1conf *conf, struct r1bio *r1_bio)
 	r1_bio->sector, r1_bio->sectors);
 	s = r1_bio->sector;
 	sectors = r1_bio->sectors;
-	printk("MikeT: read error, s: %u, sectors: %u\n", s, sectors);
-	printk("MikeT: read error, s: %u, sectors: %u\n", r1_bio->bios[r1_bio->read_disk]->bi_iter.bi_sector, r1_bio->bios[r1_bio->read_disk]->bi_iter.bi_size);
 		
 	if(test_bit(9, &r1_bio->bios[r1_bio->read_disk]->bi_flags))
 	{//9 stands for GC
